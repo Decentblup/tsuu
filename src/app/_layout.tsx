@@ -1,15 +1,55 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { initDatabase, seedHabitsIfEmpty } from '@/database';
+import { Colors } from '@/constants/theme';
+import { ThemeProvider, useTheme } from '@/hooks/use-theme';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+function AppContent() {
+  const { colors } = useTheme();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ 
+        headerStyle: { backgroundColor: colors.backgroundElement },
+        headerTintColor: colors.text,
+        contentStyle: { backgroundColor: colors.background }
+      }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  const [dbReady, setDbReady] = useState(false);
+
+  useEffect(() => {
+    async function setupDb() {
+      try {
+        await initDatabase();
+        await seedHabitsIfEmpty();
+        setDbReady(true);
+      } catch (e) {
+        console.error('Failed to initialize database', e);
+      }
+    }
+    setupDb();
+  }, []);
+
+  if (!dbReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background }}>
+        <ActivityIndicator size="large" color={Colors.dark.primary} />
+        <Text style={{ color: Colors.dark.text, marginTop: 16 }}>Loading Habit Tracker...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ThemeProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }
