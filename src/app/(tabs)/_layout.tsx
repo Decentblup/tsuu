@@ -2,9 +2,11 @@ import { View, Image, Text, Pressable } from 'react-native';
 import { Tabs, router } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { CalendarDays, BarChart3, Settings } from 'lucide-react-native';
+import { useSound } from '@/hooks/useSound';
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { playSound } = useSound();
   return (
     <Tabs
       screenOptions={{
@@ -42,7 +44,10 @@ export default function TabLayout() {
           ),
           headerRight: () => (
             <Pressable 
-              onPress={() => router.push('/manage')}
+              onPress={() => {
+                playSound('settings');
+                router.push('/settings');
+              }}
               style={({ pressed }) => ({
                 marginRight: 16,
                 opacity: pressed ? 0.7 : 1,
@@ -52,6 +57,9 @@ export default function TabLayout() {
             </Pressable>
           ),
           tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+        }}
+        listeners={{
+          tabPress: () => playSound('timeline'),
         }}
       />
       <Tabs.Screen
@@ -70,7 +78,10 @@ export default function TabLayout() {
           ),
           headerRight: () => (
             <Pressable 
-              onPress={() => router.push('/manage')}
+              onPress={() => {
+                playSound('settings');
+                router.push('/settings');
+              }}
               style={({ pressed }) => ({
                 marginRight: 16,
                 opacity: pressed ? 0.7 : 1,
@@ -81,13 +92,8 @@ export default function TabLayout() {
           ),
           tabBarIcon: ({ color, size }) => <BarChart3 color={color} size={size} />,
         }}
-      />
-      <Tabs.Screen
-        name="manage"
-        options={{
-          href: null,
-          title: 'Manage',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+        listeners={{
+          tabPress: () => playSound('statistics'),
         }}
       />
     </Tabs>

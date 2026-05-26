@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Habit } from '@/database';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useSound } from '@/hooks/useSound';
 
 interface Props {
   habit: Habit;
@@ -17,6 +18,7 @@ interface Props {
 
 export function HabitInput({ habit, value, onChange, disabled = false, onInteractionStart, onInteractionEnd }: Props) {
   const { colors } = useTheme();
+  const { playSound } = useSound();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
@@ -90,7 +92,10 @@ export function HabitInput({ habit, value, onChange, disabled = false, onInterac
                 maximumValue={max}
                 step={1}
                 value={numVal}
-                onValueChange={(v) => onChange(v.toString())}
+                onValueChange={(v) => {
+                  playSound('slider');
+                  onChange(v.toString());
+                }}
                 onSlidingStart={onInteractionStart}
                 onSlidingComplete={onInteractionEnd}
                 minimumTrackTintColor={disabled ? colors.surface2 : colors.primary}
@@ -107,7 +112,12 @@ export function HabitInput({ habit, value, onChange, disabled = false, onInterac
           <View>
             <Pressable
               style={[styles.timeBtn, disabled && styles.timeBtnDisabled]}
-              onPress={() => { if (!disabled) setShowTimePicker(true); }}
+              onPress={() => { 
+                if (!disabled) {
+                  playSound('setTime');
+                  setShowTimePicker(true); 
+                }
+              }}
             >
               <Text style={styles.timeText}>{value || 'Select Time'}</Text>
             </Pressable>

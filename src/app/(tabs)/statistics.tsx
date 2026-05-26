@@ -1,8 +1,11 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Dimensions, InteractionManager } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import Animated from 'react-native-reanimated';
+import { useTabTransition } from '@/hooks/useTabTransition';
 import { getHabits, getHabitLogsForRange, Habit, HabitType } from '@/database';
 import { useTheme } from '@/hooks/use-theme';
+import { useSound } from '@/hooks/useSound';
 import { ChevronLeft, ChevronRight, LayoutGrid, LineChart } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -11,7 +14,9 @@ type Period = 'Weekly' | 'Monthly' | 'Yearly';
 
 export default function StatisticsScreen() {
   const { colors } = useTheme();
+  const { playSound } = useSound();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const tabAnimStyle = useTabTransition('right');
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('Weekly');
@@ -32,7 +37,10 @@ export default function StatisticsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchInitialData();
+      const task = InteractionManager.runAfterInteractions(() => {
+        fetchInitialData();
+      });
+      return () => task.cancel();
     }, [fetchInitialData])
   );
 
@@ -212,9 +220,9 @@ export default function StatisticsScreen() {
              )}
           </View>
           <View style={styles.yearControls}>
-            <Pressable onPress={() => setViewYear(v => v - 1)} style={styles.yearBtn}><ChevronLeft size={16} color={colors.text} /></Pressable>
+            <Pressable onPress={() => { playSound('statistics'); setViewYear(v => v - 1); }} style={styles.yearBtn}><ChevronLeft size={16} color={colors.text} /></Pressable>
             <Text style={styles.yearText}>{viewYear}</Text>
-            <Pressable onPress={() => setViewYear(v => v + 1)} style={styles.yearBtn}><ChevronRight size={16} color={colors.text} /></Pressable>
+            <Pressable onPress={() => { playSound('statistics'); setViewYear(v => v + 1); }} style={styles.yearBtn}><ChevronRight size={16} color={colors.text} /></Pressable>
           </View>
         </View>
         
@@ -230,7 +238,7 @@ export default function StatisticsScreen() {
                 {week.map((date, dayIdx) => (
                   <Pressable
                     key={`day-${weekIdx}-${dayIdx}`} 
-                    onPress={() => date && setSelectedDate(date)}
+                    onPress={() => { if (date) { playSound('statistics'); setSelectedDate(date); } }}
                     style={[
                       styles.heatmapDay, 
                       { backgroundColor: getColor(getIntensity(date)) },
@@ -246,13 +254,13 @@ export default function StatisticsScreen() {
           {goalConfig ? (
             <View style={styles.modeSelector}>
               <Pressable 
-                onPress={() => setHeatmapMode('value')} 
+                onPress={() => { playSound('statistics'); setHeatmapMode('value'); }} 
                 style={[styles.modeBtn, heatmapMode === 'value' && styles.modeBtnActive]}
               >
                 <Text style={[styles.modeText, heatmapMode === 'value' && styles.modeTextActive]}>Value</Text>
               </Pressable>
               <Pressable 
-                onPress={() => setHeatmapMode('goal')} 
+                onPress={() => { playSound('statistics'); setHeatmapMode('goal'); }} 
                 style={[styles.modeBtn, heatmapMode === 'goal' && styles.modeBtnActive]}
               >
                 <Text style={[styles.modeText, heatmapMode === 'goal' && styles.modeTextActive]}>Goal</Text>
@@ -323,7 +331,7 @@ export default function StatisticsScreen() {
             {(['Weekly', 'Monthly', 'Yearly'] as Period[]).map(p => (
                <Pressable 
                 key={p} 
-                onPress={() => setSelectedPeriod(p)}
+                onPress={() => { playSound('statistics'); setSelectedPeriod(p); }}
                 style={[styles.periodBtn, selectedPeriod === p && styles.periodBtnActive]}
                >
                  <Text style={[styles.periodText, selectedPeriod === p && styles.periodTextActive]}>{p}</Text>
@@ -351,7 +359,7 @@ export default function StatisticsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <Animated.ScrollView style={[styles.container, tabAnimStyle]} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         {habits.length === 0 ? (
           <Text style={styles.emptyText}>Create some habits to see statistics!</Text>
@@ -360,7 +368,7 @@ export default function StatisticsScreen() {
             {habits.map(h => (
               <Pressable 
                 key={h.id} 
-                onPress={() => setSelectedHabit(h)}
+                onPress={() => { playSound('statistics'); setSelectedHabit(h); }}
                 style={[styles.habitChip, selectedHabit?.id === h.id && styles.habitChipActive]}
               >
                  <Text style={[styles.habitChipText, selectedHabit?.id === h.id && styles.habitChipTextActive]}>
@@ -395,7 +403,7 @@ export default function StatisticsScreen() {
           )}
         </>
       )}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 

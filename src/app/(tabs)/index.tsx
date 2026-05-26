@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, FlatList, StyleSheet, Dimensions, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
+import { useTabTransition } from '@/hooks/useTabTransition';
 import { DayLogEntry } from '@/components/DayLogEntry';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
@@ -9,6 +11,7 @@ const { width } = Dimensions.get('window');
 export default function TimelineScreen() {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const tabAnimStyle = useTabTransition('left', true);
   const [dates, setDates] = useState<string[]>([]);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -35,7 +38,7 @@ export default function TimelineScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, tabAnimStyle]}>
       <FlatList
         data={dates}
         scrollEnabled={scrollEnabled}
@@ -48,6 +51,10 @@ export default function TimelineScreen() {
         disableIntervalMomentum={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        initialNumToRender={1}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={true}
         renderItem={({ item }) => (
           <View style={{ width, flex: 1 }}>
              <DayLogEntry date={item} onScrollChange={setScrollEnabled} />
@@ -93,7 +100,7 @@ export default function TimelineScreen() {
           {currentIndex === dates.length - 1 && <View style={styles.arrowPlaceholder} />}
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

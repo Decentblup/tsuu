@@ -17,6 +17,14 @@ function AppContent() {
         contentStyle: { backgroundColor: colors.background }
       }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="settings"
+          options={{
+            headerShown: false,
+            presentation: 'transparentModal',
+            animation: 'none',
+          }}
+        />
       </Stack>
     </GestureHandlerRootView>
   );

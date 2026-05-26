@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, TextInput, Platform, InteractionManager } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -60,7 +60,10 @@ export function DayLogEntry({ date, onScrollChange }: { date: string, onScrollCh
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
+      const task = InteractionManager.runAfterInteractions(() => {
+        fetchData();
+      });
+      return () => task.cancel();
     }, [fetchData])
   );
 
