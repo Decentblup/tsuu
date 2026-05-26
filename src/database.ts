@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
-export type HabitType = 'checkbox' | 'number' | 'slider' | 'time';
+export type HabitType = 'checkbox' | 'number' | 'slider' | 'time' | 'photo' | 'notes';
 
 export interface DayEntry {
   date: string;
@@ -72,6 +72,20 @@ export async function initDatabase() {
   try {
     await db.execAsync(`ALTER TABLE days ADD COLUMN notes TEXT;`);
   } catch (e) {}
+
+  await ensureSystemHabits();
+}
+
+async function ensureSystemHabits() {
+  const db = await getDb();
+  const photo = await db.getFirstAsync('SELECT * FROM habits WHERE type = ?', ['photo']);
+  if (!photo) {
+    await db.runAsync('INSERT INTO habits (name, type, order_index) VALUES (?, ?, ?)', ['Photo', 'photo', -2]);
+  }
+  const notes = await db.getFirstAsync('SELECT * FROM habits WHERE type = ?', ['notes']);
+  if (!notes) {
+    await db.runAsync('INSERT INTO habits (name, type, order_index) VALUES (?, ?, ?)', ['Notes', 'notes', -1]);
+  }
 }
 
 export async function getDay(date: string): Promise<DayEntry & { notes: string | null } | null> {
@@ -117,7 +131,14 @@ export async function getHabits(includeArchived = false): Promise<Habit[]> {
   if (includeArchived) {
     return await db.getAllAsync<Habit>('SELECT * FROM habits ORDER BY order_index ASC, id ASC');
   }
+  // By default, do not return archived habits. We also don't automatically exclude system habits here, because DayLogEntry needs them. 
+  // But wait, DayLogEntry uses getHabits(true).
   return await db.getAllAsync<Habit>('SELECT * FROM habits WHERE is_archived = 0 ORDER BY order_index ASC, id ASC');
+}
+
+export async function getSettingsHabits(): Promise<Habit[]> {
+  const db = await getDb();
+  return await db.getAllAsync<Habit>("SELECT * FROM habits WHERE is_archived = 0 OR type IN ('photo', 'notes') ORDER BY order_index ASC, id ASC");
 }
 
 export async function createHabit(name: string, type: HabitType, config: string | null = null, orderIndex: number = 0) {
@@ -154,6 +175,11 @@ export async function updateHabitOrder(habitIds: number[]) {
 export async function deleteHabit(habitId: number) {
   const db = await getDb();
   await db.runAsync('UPDATE habits SET is_archived = 1 WHERE id = ?', [habitId]);
+}
+
+export async function toggleHabitArchiveStatus(habitId: number, isArchived: number) {
+  const db = await getDb();
+  await db.runAsync('UPDATE habits SET is_archived = ? WHERE id = ?', [isArchived, habitId]);
 }
 
 export async function getHabitLogs(date: string): Promise<HabitLog[]> {
@@ -214,7 +240,7 @@ export interface DailyCompletionRate {
 
 export async function getHabitStreaks(): Promise<HabitStreak[]> {
   const db = await getDb();
-  const habits = await getHabits(false);
+  const habits = await db.getAllAsync<Habit>("SELECT * FROM habits WHERE is_archived = 0 AND type NOT IN ('photo', 'notes') ORDER BY order_index ASC, id ASC");
 
   const results: HabitStreak[] = [];
 
@@ -288,7 +314,7 @@ export async function getHabitStreaks(): Promise<HabitStreak[]> {
 
 export async function getWeeklyCompletionRates(): Promise<DailyCompletionRate[]> {
   const db = await getDb();
-  const habits = await getHabits(false);
+  const habits = await db.getAllAsync<Habit>("SELECT * FROM habits WHERE is_archived = 0 AND type NOT IN ('photo', 'notes') ORDER BY order_index ASC, id ASC");
   const totalHabits = habits.length;
   if (totalHabits === 0) return [];
 
@@ -302,7 +328,7 @@ export async function getWeeklyCompletionRates(): Promise<DailyCompletionRate[]>
     const dateStr = new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
 
     const logs = await db.getAllAsync<{ value: string }>(
-      'SELECT value FROM habit_logs WHERE date = ? AND habit_id IN (SELECT id FROM habits WHERE is_archived = 0)',
+      "SELECT value FROM habit_logs WHERE date = ? AND habit_id IN (SELECT id FROM habits WHERE is_archived = 0 AND type NOT IN ('photo', 'notes'))",
       [dateStr]
     );
 

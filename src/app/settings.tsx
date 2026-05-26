@@ -2,11 +2,14 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { useFocusEffect, router } from 'expo-router';
-import { getHabits, createHabit, updateHabit, deleteHabit, updateHabitOrder, Habit, HabitType } from '@/database';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSettingsHabits, toggleHabitArchiveStatus, createHabit, updateHabit, deleteHabit, updateHabitOrder, Habit, HabitType } from '@/database';
 import { Themes, ThemeId } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSound } from '@/hooks/useSound';
-import { Trash2, Edit2, X, Check, GripVertical, ArrowLeft } from 'lucide-react-native';
+import { getReminderSettings, scheduleDailyReminder, cancelReminder } from '@/hooks/useNotifications';
+import { Trash2, Edit2, X, Check, GripVertical, ArrowLeft, Eye, EyeOff, Bell } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -20,8 +23,9 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function SettingsScreen() {
   const { themeId, setThemeId, colors } = useTheme();
-  const { playSound } = useSound();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { playSound, soundsEnabled, setSoundsEnabled } = useSound();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -39,6 +43,11 @@ export default function SettingsScreen() {
   const [goalEnabled, setGoalEnabled] = useState(false);
   const [goalDirection, setGoalDirection] = useState<'on' | 'off' | 'above' | 'below'>('above');
   const [goalTarget, setGoalTarget] = useState('');
+
+  // Reminder state
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('21:00');
+  const [showReminderTimePicker, setShowReminderTimePicker] = useState(false);
 
   // Slide-from-top animation
   const translateY = useSharedValue(-SCREEN_HEIGHT);
@@ -74,13 +83,18 @@ export default function SettingsScreen() {
   }));
 
   const fetchHabits = useCallback(async () => {
-    const data = await getHabits(false);
+    const data = await getSettingsHabits();
     setHabits(data);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchHabits();
+      // Load reminder settings
+      getReminderSettings().then(({ enabled, time }) => {
+        setReminderEnabled(enabled);
+        setReminderTime(time);
+      });
     }, [fetchHabits])
   );
 
@@ -177,6 +191,13 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleToggleVisibility = async (h: Habit) => {
+    playSound('settings');
+    const newStatus = h.is_archived === 1 ? 0 : 1;
+    await toggleHabitArchiveStatus(h.id, newStatus);
+    fetchHabits();
+  };
+
   const renderHabitItem = ({ item, drag, isActive }: RenderItemParams<Habit>) => (
     <ScaleDecorator>
       <View style={[styles.habitCard, isActive && styles.habitCardActive]}>
@@ -190,12 +211,24 @@ export default function SettingsScreen() {
           <Text style={styles.habitType}>{item.type.toUpperCase()}</Text>
         </View>
         <View style={styles.actions}>
-          <Pressable onPress={() => handleStartEdit(item)} style={styles.iconBtn}>
-            <Edit2 color={colors.textSecondary} size={20} />
-          </Pressable>
-          <Pressable onPress={() => handleDelete(item)} style={styles.iconBtn}>
-            <Trash2 color={colors.red} size={20} />
-          </Pressable>
+          {(item.type === 'photo' || item.type === 'notes') ? (
+            <Pressable onPress={() => handleToggleVisibility(item)} style={styles.iconBtn}>
+              {item.is_archived === 1 ? (
+                <EyeOff color={colors.textSecondary} size={20} />
+              ) : (
+                <Eye color={colors.textSecondary} size={20} />
+              )}
+            </Pressable>
+          ) : (
+            <>
+              <Pressable onPress={() => handleStartEdit(item)} style={styles.iconBtn}>
+                <Edit2 color={colors.textSecondary} size={20} />
+              </Pressable>
+              <Pressable onPress={() => handleDelete(item)} style={styles.iconBtn}>
+                <Trash2 color={colors.red} size={20} />
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
     </ScaleDecorator>
@@ -243,6 +276,18 @@ export default function SettingsScreen() {
               <>
                 <View style={[styles.formContainer, { backgroundColor: colors.backgroundElement, borderColor: colors.border, zIndex: 1000 }]}>
                   <Text style={[styles.formTitle, { color: colors.text }]}>Appearance</Text>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 }}>
+                    <Text style={{ color: colors.text, fontSize: 16 }}>UI Sounds</Text>
+                    <View style={{ flexDirection: 'row', backgroundColor: colors.surface0, borderRadius: 8, padding: 3 }}>
+                       <Pressable style={[soundsEnabled ? { backgroundColor: colors.surface2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1 } : {}, { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6, marginRight: 4 }]} onPress={() => { playSound('settings'); setSoundsEnabled(true); }}>
+                           <Text style={{ color: soundsEnabled ? colors.text : colors.textSecondary, fontSize: 13, fontWeight: '700' }}>ON</Text>
+                       </Pressable>
+                       <Pressable style={[!soundsEnabled ? { backgroundColor: colors.surface2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1 } : {}, { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 }]} onPress={() => { playSound('settings'); setSoundsEnabled(false); }}>
+                           <Text style={{ color: !soundsEnabled ? colors.text : colors.textSecondary, fontSize: 13, fontWeight: '700' }}>OFF</Text>
+                       </Pressable>
+                    </View>
+                  </View>
 
                   <View style={{ zIndex: 1000 }}>
                     <Pressable
@@ -296,6 +341,74 @@ export default function SettingsScreen() {
                       </View>
                     )}
                   </View>
+                </View>
+
+                <View style={[styles.formContainer, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <Bell color={colors.primary} size={20} />
+                    <Text style={[styles.formTitle, { color: colors.text, marginBottom: 0 }]}>Notifications</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: reminderEnabled ? 12 : 0 }}>
+                    <Text style={{ color: colors.text, fontSize: 16 }}>Daily Reminder</Text>
+                    <View style={{ flexDirection: 'row', backgroundColor: colors.surface0, borderRadius: 8, padding: 3 }}>
+                       <Pressable style={[reminderEnabled ? { backgroundColor: colors.surface2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1 } : {}, { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6, marginRight: 4 }]} onPress={async () => {
+                         playSound('settings');
+                         const [h, m] = reminderTime.split(':').map(Number);
+                         const success = await scheduleDailyReminder(h, m);
+                         if (success) {
+                           setReminderEnabled(true);
+                         } else {
+                           Alert.alert('Permission Required', 'Please enable notification permissions in your device settings to use reminders.');
+                         }
+                       }}>
+                           <Text style={{ color: reminderEnabled ? colors.text : colors.textSecondary, fontSize: 13, fontWeight: '700' }}>ON</Text>
+                       </Pressable>
+                       <Pressable style={[!reminderEnabled ? { backgroundColor: colors.surface2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 1 } : {}, { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 }]} onPress={async () => {
+                         playSound('settings');
+                         await cancelReminder();
+                         setReminderEnabled(false);
+                       }}>
+                           <Text style={{ color: !reminderEnabled ? colors.text : colors.textSecondary, fontSize: 13, fontWeight: '700' }}>OFF</Text>
+                       </Pressable>
+                    </View>
+                  </View>
+
+                  {reminderEnabled && (
+                    <Pressable
+                      style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface1, marginBottom: 0 }]}
+                      onPress={() => { playSound('settings'); setShowReminderTimePicker(true); }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 16 }}>Remind at</Text>
+                      <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '700' }}>{reminderTime}</Text>
+                    </Pressable>
+                  )}
+
+                  {showReminderTimePicker && (
+                    <DateTimePicker
+                      value={(() => {
+                        const [h, m] = reminderTime.split(':').map(Number);
+                        const d = new Date();
+                        d.setHours(h, m, 0, 0);
+                        return d;
+                      })()}
+                      mode="time"
+                      display="default"
+                      themeVariant="dark"
+                      onValueChange={async (_event: any, selectedDate: Date | undefined) => {
+                        setShowReminderTimePicker(false);
+                        if (selectedDate) {
+                          const h = selectedDate.getHours();
+                          const m = selectedDate.getMinutes();
+                          const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                          setReminderTime(timeStr);
+                          if (reminderEnabled) {
+                            await scheduleDailyReminder(h, m);
+                          }
+                        }
+                      }}
+                    />
+                  )}
                 </View>
 
                 <View style={styles.formContainer}>
@@ -448,7 +561,7 @@ export default function SettingsScreen() {
   );
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, topInset: number = 0) => StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'black',
@@ -459,7 +572,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
+    paddingTop: Math.max(topInset + 16, Platform.OS === 'ios' ? 60 : 40),
     paddingBottom: 12,
     backgroundColor: colors.backgroundElement,
     borderBottomWidth: 1,

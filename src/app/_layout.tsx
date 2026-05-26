@@ -5,6 +5,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDatabase, seedHabitsIfEmpty } from '@/database';
 import { Colors } from '@/constants/theme';
 import { ThemeProvider, useTheme } from '@/hooks/use-theme';
+import { SoundProvider } from '@/hooks/useSound';
+import { setupNotificationHandler } from '@/hooks/useNotifications';
 
 function AppContent() {
   const { colors } = useTheme();
@@ -38,6 +40,7 @@ export default function RootLayout() {
       try {
         await initDatabase();
         await seedHabitsIfEmpty();
+        await setupNotificationHandler();
         setDbReady(true);
       } catch (e) {
         console.error('Failed to initialize database', e);
@@ -57,7 +60,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <AppContent />
+      <SoundProvider>
+        <AppContent />
+      </SoundProvider>
     </ThemeProvider>
   );
 }

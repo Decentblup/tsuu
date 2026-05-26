@@ -28,7 +28,7 @@ export default function StatisticsScreen() {
   const heatmapScrollRef = React.useRef<ScrollView>(null);
 
   const fetchInitialData = useCallback(async () => {
-    const allHabits = await getHabits(false);
+    const allHabits = (await getHabits(false)).filter(h => h.type !== 'photo' && h.type !== 'notes');
     setHabits(allHabits);
     if (allHabits.length > 0 && !selectedHabit) {
       setSelectedHabit(allHabits[0]);

@@ -1,4 +1,6 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createAudioPlayer, preload, AudioPlayer } from 'expo-audio';
+import { getSetting, setSetting } from '@/database';
 
 const sTimeline = require('../../assets/sounds/timeline.wav');
 const sStats = require('../../assets/sounds/statistics.wav');
@@ -21,7 +23,6 @@ class SoundPool {
   constructor(source: any, count = 3) {
     for (let i = 0; i < count; i++) {
         const player = createAudioPlayer(source);
-        // Ensure strictly max volume natively
         player.volume = 1.0;
         this.players.push(player);
         this.hasPlayed.push(false);
@@ -33,10 +34,6 @@ class SoundPool {
       const idx = this.currentIndex;
       const player = this.players[idx];
       
-      // Android Mediaplayer causes native playback to drop if we call seekTo(0) 
-      // before it has fully finished async native initialization/buffering.
-      // Since new players inherently start at 0, we can safely skip the rewind 
-      // on their absolute first use and just call play(), allowing it to natively queue.
       if (this.hasPlayed[idx]) {
         player.seekTo(0); 
       }
@@ -58,8 +55,39 @@ const settingsPool = new SoundPool(sSettings, 3);
 const setTimePool = new SoundPool(sSetTime, 3);
 const sliderPool = new SoundPool(sSlider, 15);
 
-export const useSound = () => {
+interface SoundContextType {
+  soundsEnabled: boolean;
+  setSoundsEnabled: (enabled: boolean) => Promise<void>;
+  playSound: (name: 'timeline' | 'statistics' | 'settings' | 'setTime' | 'slider') => void;
+}
+
+const SoundContext = createContext<SoundContextType>({
+  soundsEnabled: true,
+  setSoundsEnabled: async () => {},
+  playSound: () => {},
+});
+
+export function SoundProvider({ children }: { children: ReactNode }): React.JSX.Element {
+  const [soundsEnabled, setSoundsEnabledState] = useState(true);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const val = await getSetting('sounds_enabled', 'true');
+        setSoundsEnabledState(val === 'true');
+      } catch (e) {}
+    }
+    loadSettings();
+  }, []);
+
+  const setSoundsEnabled = async (enabled: boolean) => {
+    setSoundsEnabledState(enabled);
+    await setSetting('sounds_enabled', enabled ? 'true' : 'false');
+  };
+
   const playSound = (name: 'timeline' | 'statistics' | 'settings' | 'setTime' | 'slider') => {
+    if (!soundsEnabled) return;
+    
     if (name === 'timeline') timelinePool.play();
     else if (name === 'statistics') statisticsPool.play();
     else if (name === 'settings') settingsPool.play();
@@ -67,5 +95,12 @@ export const useSound = () => {
     else if (name === 'slider') sliderPool.play();
   };
 
-  return { playSound };
-};
+  return (
+    <SoundContext.Provider value={{ soundsEnabled, setSoundsEnabled, playSound }}>
+      {children}
+    </SoundContext.Provider>
+  );
+}
+
+export const useSound = () => useContext(SoundContext);
+

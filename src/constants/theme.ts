@@ -176,7 +176,7 @@ export const Themes = {
     }
   },
   'discord-dark': {
-    name: 'Discord Dark',
+    name: 'Dark Mode',
     colors: {
       ...DiscordDark,
       background: DiscordDark.base,

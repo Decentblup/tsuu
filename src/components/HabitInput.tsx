@@ -110,17 +110,33 @@ export function HabitInput({ habit, value, onChange, disabled = false, onInterac
 
         {habit.type === 'time' && (
           <View>
-            <Pressable
-              style={[styles.timeBtn, disabled && styles.timeBtnDisabled]}
-              onPress={() => { 
-                if (!disabled) {
-                  playSound('setTime');
-                  setShowTimePicker(true); 
-                }
-              }}
-            >
-              <Text style={styles.timeText}>{value || 'Select Time'}</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                style={[styles.timeBtn, disabled && styles.timeBtnDisabled, { flex: 1 }]}
+                onPress={() => { 
+                  if (!disabled) {
+                    playSound('setTime');
+                    setShowTimePicker(true); 
+                  }
+                }}
+              >
+                <Text style={styles.timeText}>{value || 'Select Time'}</Text>
+              </Pressable>
+
+              {!disabled && (
+                <Pressable
+                  style={styles.currentTimeBtn}
+                  onPress={() => {
+                    playSound('setTime');
+                    const now = new Date();
+                    const timeString = now.toTimeString().substring(0, 5);
+                    onChange(timeString);
+                  }}
+                >
+                  <Text style={styles.currentTimeBtnText}>Current Time</Text>
+                </Pressable>
+              )}
+            </View>
             {showTimePicker && (
               <DateTimePicker
                 value={value ? new Date(`1970-01-01T${value}:00`) : new Date()}
@@ -217,5 +233,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     fontWeight: '500',
+  },
+  currentTimeBtn: {
+    backgroundColor: colors.surface2,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentTimeBtnText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

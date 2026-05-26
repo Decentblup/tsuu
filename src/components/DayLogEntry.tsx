@@ -50,7 +50,11 @@ export function DayLogEntry({ date, onScrollChange }: { date: string, onScrollCh
 
     const visibleHabits = allHabits.filter(h => {
       if (h.is_archived === 0) return true;
-      if (!isToday && logsMap[h.id] !== undefined) return true;
+      if (!isToday) {
+        if (h.type === 'photo' && dayData?.image_uri) return true;
+        if (h.type === 'notes' && dayData?.notes) return true;
+        if (h.type !== 'photo' && h.type !== 'notes' && logsMap[h.id] !== undefined) return true;
+      }
       return false;
     });
     setHabits(visibleHabits);
@@ -160,72 +164,79 @@ export function DayLogEntry({ date, onScrollChange }: { date: string, onScrollCh
           </View>
         </View>
 
-      {/* Picture Section */}
-      <Pressable 
-        style={styles.imageSection}
-        onPress={() => {
-          if (editing) setShowPhotoDropdown(!showPhotoDropdown);
-        }}
-      >
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={[styles.imagePreview, showPhotoDropdown && { opacity: 0.5 }]} />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            {editing ? (
-              <>
-                <Camera color={colors.textSecondary} size={32} style={{ marginBottom: 8 }} />
-                <Text style={styles.placeholderText}>Tap to add photo</Text>
-              </>
-            ) : (
-              <Text style={styles.placeholderText}>No photo was added for this day</Text>
-            )}
-          </View>
-        )}
-        
-        {editing && showPhotoDropdown && (
-          <View style={styles.photoDropdown}>
-            <Pressable style={styles.dropdownBtn} onPress={() => { setShowPhotoDropdown(false); pickImage(true); }}>
-              <Camera color={colors.text} size={20} />
-              <Text style={styles.btnText}>Camera</Text>
-            </Pressable>
-            <View style={styles.dropdownDivider} />
-            <Pressable style={styles.dropdownBtn} onPress={() => { setShowPhotoDropdown(false); pickImage(false); }}>
-              <ImageIcon color={colors.text} size={20} />
-              <Text style={styles.btnText}>Gallery</Text>
-            </Pressable>
-          </View>
-        )}
-      </Pressable>
-
-      {/* Notes Section */}
-      <View style={styles.notesSection}>
-         <Text style={styles.sectionTitle}>Notes</Text>
-         <TextInput
-           style={[styles.notesInput, !editing && styles.notesInputDisabled]}
-           placeholder={editing ? "How was your day?" : "No notes for this day"}
-           placeholderTextColor={colors.textSecondary}
-           value={notes}
-           onChangeText={handleNotesChange}
-           multiline
-           editable={editing}
-           textAlignVertical="top"
-         />
-      </View>
-
-        {/* Habits Section */}
         <View style={styles.habitsSection}>
-          <Text style={styles.sectionTitle}>Habits</Text>
-          {habits.map(habit => (
-            <HabitInput
-              key={habit.id}
-              habit={habit}
-              value={logs[habit.id] || ''}
-              onChange={(val) => handleUpdateLog(habit.id, val)}
-              disabled={!editing}
-              onInteractionStart={() => onScrollChange?.(false)}
-              onInteractionEnd={() => onScrollChange?.(true)}
-            />
-          ))}
+          {habits.map(habit => {
+            if (habit.type === 'photo') {
+              return (
+                <Pressable 
+                  key={habit.id}
+                  style={styles.imageSection}
+                  onPress={() => {
+                    if (editing) setShowPhotoDropdown(!showPhotoDropdown);
+                  }}
+                >
+                  {imageUri ? (
+                    <Image source={{ uri: imageUri }} style={[styles.imagePreview, showPhotoDropdown && { opacity: 0.5 }]} />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      {editing ? (
+                        <>
+                          <Camera color={colors.textSecondary} size={32} style={{ marginBottom: 8 }} />
+                          <Text style={styles.placeholderText}>Tap to add photo</Text>
+                        </>
+                      ) : (
+                        <Text style={styles.placeholderText}>No photo was added for this day</Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {editing && showPhotoDropdown && (
+                    <View style={styles.photoDropdown}>
+                      <Pressable style={styles.dropdownBtn} onPress={() => { setShowPhotoDropdown(false); pickImage(true); }}>
+                        <Camera color={colors.text} size={20} />
+                        <Text style={styles.btnText}>Camera</Text>
+                      </Pressable>
+                      <View style={styles.dropdownDivider} />
+                      <Pressable style={styles.dropdownBtn} onPress={() => { setShowPhotoDropdown(false); pickImage(false); }}>
+                        <ImageIcon color={colors.text} size={20} />
+                        <Text style={styles.btnText}>Gallery</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            }
+
+            if (habit.type === 'notes') {
+              return (
+                <View key={habit.id} style={styles.notesSection}>
+                  <Text style={styles.sectionTitle}>Notes</Text>
+                  <TextInput
+                    style={[styles.notesInput, !editing && styles.notesInputDisabled]}
+                    placeholder={editing ? "How was your day?" : "No notes for this day"}
+                    placeholderTextColor={colors.textSecondary}
+                    value={notes}
+                    onChangeText={handleNotesChange}
+                    multiline
+                    editable={editing}
+                    textAlignVertical="top"
+                  />
+                </View>
+              );
+            }
+
+            return (
+              <HabitInput
+                key={habit.id}
+                habit={habit}
+                value={logs[habit.id] || ''}
+                onChange={(val) => handleUpdateLog(habit.id, val)}
+                disabled={!editing}
+                onInteractionStart={() => onScrollChange?.(false)}
+                onInteractionEnd={() => onScrollChange?.(true)}
+              />
+            );
+          })}
         </View>
       </View>
     </KeyboardAwareScrollView>
