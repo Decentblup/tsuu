@@ -4,6 +4,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { getDay, getHabits, getHabitLogs, upsertDayEntry, upsertHabitLog, Habit, HabitLog } from '@/database';
 import { HabitInput } from '@/components/HabitInput';
 import { Colors } from '@/constants/theme';
@@ -108,17 +109,34 @@ export function DayLogEntry({ date, onScrollChange }: { date: string, onScrollCh
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const tempUri = result.assets[0].uri;
-      const filename = tempUri.split('/').pop();
-      const newUri = `${FileSystem.documentDirectory}${date}-${filename}`;
       try {
-        await FileSystem.copyAsync({ from: tempUri, to: newUri });
+        // Compress and resize the image
+        const context = ImageManipulator.manipulate(tempUri);
+        context.resize({ width: 1080 });
+        const rendered = await context.renderAsync();
+        const compressed = await rendered.saveAsync({
+          format: SaveFormat.JPEG,
+          compress: 0.8,
+        });
+
+        const filename = compressed.uri.split('/').pop();
+        const newUri = `${FileSystem.documentDirectory}${date}-${filename}`;
+        await FileSystem.copyAsync({ from: compressed.uri, to: newUri });
         setImageUri(newUri);
-        // Auto-save image too
         if (editing) await upsertDayEntry(date, newUri, notes);
       } catch (e) {
-        console.error('Failed to copy image to local storage', e);
-        setImageUri(tempUri);
-        if (editing) await upsertDayEntry(date, tempUri, notes);
+        console.error('Failed to compress/copy image', e);
+        // Fallback: save original
+        const filename = tempUri.split('/').pop();
+        const newUri = `${FileSystem.documentDirectory}${date}-${filename}`;
+        try {
+          await FileSystem.copyAsync({ from: tempUri, to: newUri });
+          setImageUri(newUri);
+          if (editing) await upsertDayEntry(date, newUri, notes);
+        } catch {
+          setImageUri(tempUri);
+          if (editing) await upsertDayEntry(date, tempUri, notes);
+        }
       }
     }
   };

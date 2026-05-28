@@ -1,14 +1,14 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform, Dimensions, Linking } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { useFocusEffect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getSettingsHabits, toggleHabitArchiveStatus, createHabit, updateHabit, deleteHabit, updateHabitOrder, Habit, HabitType } from '@/database';
+import { getSettingsHabits, toggleHabitArchiveStatus, createHabit, updateHabit, deleteHabit, updateHabitOrder, Habit, HabitType, exportData, importData } from '@/database';
 import { Themes, ThemeId } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSound } from '@/hooks/useSound';
 import { getReminderSettings, scheduleDailyReminder, cancelReminder } from '@/hooks/useNotifications';
-import { Trash2, Edit2, X, Check, GripVertical, ArrowLeft, Eye, EyeOff, Bell } from 'lucide-react-native';
+import { Trash2, Edit2, X, Check, GripVertical, ArrowLeft, Eye, EyeOff, Bell, Download, Upload } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, {
   useSharedValue,
@@ -259,7 +259,12 @@ export default function SettingsScreen() {
             <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
           </Pressable>
           <Text style={[styles.settingsTitle, { color: colors.text }]}>Settings</Text>
-          <View style={{ width: 70 }} />
+          <Pressable
+            onPress={() => Linking.openURL('https://buymeacoffee.com/decentblup')}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, width: 70, alignItems: 'flex-end', justifyContent: 'center' }]}
+          >
+            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Donate</Text>
+          </Pressable>
         </View>
 
         <KeyboardAvoidingView
@@ -409,6 +414,45 @@ export default function SettingsScreen() {
                       }}
                     />
                   )}
+                </View>
+
+                <View style={[styles.formContainer, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+                  <Text style={[styles.formTitle, { color: colors.text }]}>Data Management</Text>
+                  
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <Pressable
+                      style={[styles.saveBtn, { flex: 1, justifyContent: 'center', backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.border }]}
+                      onPress={async () => {
+                        playSound('settings');
+                        const success = await importData();
+                        if (success) {
+                          Alert.alert('Success', 'Data imported successfully!');
+                          fetchHabits();
+                        } else {
+                          Alert.alert('Error', 'Failed to import data or invalid file.');
+                        }
+                      }}
+                    >
+                      <Download color={colors.text} size={20} />
+                      <Text style={[styles.btnText, { color: colors.text }]}>Import Data</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={[styles.saveBtn, { flex: 1, justifyContent: 'center' }]}
+                      onPress={async () => {
+                        playSound('settings');
+                        const success = await exportData();
+                        if (success) {
+                           Alert.alert('Success', 'Data exported successfully!');
+                        } else {
+                           Alert.alert('Error', 'Failed to export data.');
+                        }
+                      }}
+                    >
+                      <Upload color={colors.base} size={20} />
+                      <Text style={styles.saveBtnText}>Export Data</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View style={styles.formContainer}>

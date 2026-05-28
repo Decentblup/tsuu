@@ -9,9 +9,11 @@ export default function TabLayout() {
   const { playSound } = useSound();
   return (
     <Tabs
+      sceneStyle={{ backgroundColor: colors.background }}
       screenOptions={{
         headerStyle: { backgroundColor: colors.backgroundElement },
         headerTintColor: colors.text,
+        sceneStyle: { backgroundColor: colors.background },
         tabBarStyle: {
           backgroundColor: colors.mantle,
           borderTopColor: colors.surface0,

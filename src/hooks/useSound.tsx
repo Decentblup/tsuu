@@ -17,30 +17,24 @@ preload(sSlider);
 
 class SoundPool {
   players: AudioPlayer[] = [];
-  hasPlayed: boolean[] = [];
   currentIndex = 0;
 
   constructor(source: any, count = 3) {
     for (let i = 0; i < count; i++) {
         const player = createAudioPlayer(source);
+        // Silent warm-up: force native audio engine + decoder to initialize
+        player.volume = 0;
+        player.play();
         player.volume = 1.0;
         this.players.push(player);
-        this.hasPlayed.push(false);
     }
   }
 
   play() {
     try {
-      const idx = this.currentIndex;
-      const player = this.players[idx];
-      
-      if (this.hasPlayed[idx]) {
-        player.seekTo(0); 
-      }
-      
-      this.hasPlayed[idx] = true;
+      const player = this.players[this.currentIndex];
+      player.seekTo(0);
       player.play();
-
       this.currentIndex = (this.currentIndex + 1) % this.players.length;
     } catch (e) {
       console.log('Error playing sound from pool', e);

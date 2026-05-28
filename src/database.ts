@@ -1,4 +1,7 @@
 import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as DocumentPicker from 'expo-document-picker';
+import { Platform } from 'react-native';
 
 export type HabitType = 'checkbox' | 'number' | 'slider' | 'time' | 'photo' | 'notes';
 
@@ -350,4 +353,97 @@ export async function getTotalDaysTracked(): Promise<number> {
     "SELECT COUNT(DISTINCT date) as count FROM habit_logs WHERE value != '' AND value != '0' AND value != 'false'"
   );
   return result?.count ?? 0;
+}
+
+export async function exportData() {
+  const db = await getDb();
+  const days = await db.getAllAsync('SELECT * FROM days');
+  const habits = await db.getAllAsync('SELECT * FROM habits');
+  const habit_logs = await db.getAllAsync('SELECT * FROM habit_logs');
+  const settings = await db.getAllAsync('SELECT * FROM settings');
+
+  const data = {
+    days,
+    habits,
+    habit_logs,
+    settings,
+    version: 1
+  };
+
+  const jsonStr = JSON.stringify(data);
+
+  if (Platform.OS === 'android') {
+    const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (permissions.granted) {
+      try {
+        const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          'tsuu-backup.json',
+          'application/json'
+        );
+        await FileSystem.writeAsStringAsync(fileUri, jsonStr, { encoding: FileSystem.EncodingType.UTF8 });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+  } else {
+    const fileUri = (FileSystem.documentDirectory || '') + 'tsuu-backup.json';
+    try {
+      await FileSystem.writeAsStringAsync(fileUri, jsonStr, { encoding: FileSystem.EncodingType.UTF8 });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+}
+
+export async function importData() {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ['application/json', 'text/plain', '*/*'],
+    copyToCacheDirectory: true,
+  });
+
+  if (result.canceled) return false;
+  
+  const fileUri = result.assets[0].uri;
+  const jsonStr = await FileSystem.readAsStringAsync(fileUri);
+  let data;
+  try {
+    data = JSON.parse(jsonStr);
+  } catch (e) {
+    return false;
+  }
+
+  if (!data || !data.version) return false;
+
+  const db = await getDb();
+
+  await db.withTransactionAsync(async () => {
+    // Clear existing
+    await db.runAsync('DELETE FROM habit_logs');
+    await db.runAsync('DELETE FROM days');
+    await db.runAsync('DELETE FROM habits');
+    await db.runAsync('DELETE FROM settings');
+
+    for (const row of data.days || []) {
+      await db.runAsync('INSERT INTO days (date, image_uri, notes) VALUES (?, ?, ?)', [row.date, row.image_uri, row.notes]);
+    }
+    
+    for (const row of data.habits || []) {
+      await db.runAsync('INSERT INTO habits (id, name, type, config, is_archived, order_index) VALUES (?, ?, ?, ?, ?, ?)', [row.id, row.name, row.type, row.config, row.is_archived, row.order_index]);
+    }
+
+    for (const row of data.habit_logs || []) {
+      await db.runAsync('INSERT INTO habit_logs (id, date, habit_id, value) VALUES (?, ?, ?, ?)', [row.id, row.date, row.habit_id, row.value]);
+    }
+
+    for (const row of data.settings || []) {
+      await db.runAsync('INSERT INTO settings (key, value) VALUES (?, ?)', [row.key, row.value]);
+    }
+  });
+
+  return true;
 }

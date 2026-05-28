@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, Image } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDatabase, seedHabitsIfEmpty } from '@/database';
 import { Colors } from '@/constants/theme';
@@ -12,7 +12,7 @@ function AppContent() {
   const { colors } = useTheme();
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack screenOptions={{ 
         headerStyle: { backgroundColor: colors.backgroundElement },
         headerTintColor: colors.text,
@@ -32,8 +32,26 @@ function AppContent() {
   );
 }
 
-export default function RootLayout() {
+function SplashScreen() {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <Image source={require('../../tsuu_logo.png')} style={{ width: 120, height: 120, resizeMode: 'contain' }} />
+      <Text style={{ color: colors.text, marginTop: 16, fontSize: 24, fontWeight: 'bold' }}>Tsuu</Text>
+    </View>
+  );
+}
+
+function RootContent() {
   const [dbReady, setDbReady] = useState(false);
+  const [minTimePassed, setMinTimePassed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimePassed(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     async function setupDb() {
@@ -49,20 +67,21 @@ export default function RootLayout() {
     setupDb();
   }, []);
 
-  if (!dbReady) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background }}>
-        <ActivityIndicator size="large" color={Colors.dark.primary} />
-        <Text style={{ color: Colors.dark.text, marginTop: 16 }}>Loading Habit Tracker...</Text>
-      </View>
-    );
+  if (!dbReady || !minTimePassed) {
+    return <SplashScreen />;
   }
 
   return (
+    <SoundProvider>
+      <AppContent />
+    </SoundProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <ThemeProvider>
-      <SoundProvider>
-        <AppContent />
-      </SoundProvider>
+      <RootContent />
     </ThemeProvider>
   );
 }
